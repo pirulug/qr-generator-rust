@@ -1,3 +1,4 @@
+use ab_glyph::{Font, FontRef, PxScale, ScaleFont};
 use image::{ImageBuffer, Rgba};
 use qrcode::{types::QrError, Color, EcLevel, QrCode};
 
@@ -44,10 +45,10 @@ impl LogoTemplate {
     pub fn label(self) -> &'static str {
         match self {
             Self::None => "---",
-            Self::HeartPulse => "Corazón / Pulso",
+            Self::HeartPulse => "Corazon / Pulso",
             Self::Star => "Estrella",
             Self::Shield => "Escudo",
-            Self::Wifi => "Símbolo Wi-Fi",
+            Self::Wifi => "Simbolo Wi-Fi",
             Self::TwitterX => "X (Twitter)",
             Self::UserContact => "Avatar de contacto",
         }
@@ -65,10 +66,10 @@ pub enum TextCasing {
 pub struct QrSettings {
     // Matrix settings
     pub ec_level: ErrorCorrection,
-    pub border: usize,       // 0..8
-    pub scale_factor: usize, // 2..15
-    pub fg_color: [u8; 4],   // default: black [0, 0, 0, 255]
-    pub bg_color: [u8; 4],   // default: white [255, 255, 255, 255]
+    pub border: usize,
+    pub scale_factor: usize,
+    pub fg_color: [u8; 4],
+    pub bg_color: [u8; 4],
 
     // Logo settings
     pub logo_enabled: bool,
@@ -102,8 +103,8 @@ impl Default for QrSettings {
             ec_level: ErrorCorrection::Low,
             border: 2,
             scale_factor: 7,
-            fg_color: [0, 0, 0, 255],         // Black (h00000000)
-            bg_color: [255, 255, 255, 255], // White (h00FFFFFF)
+            fg_color: [0, 0, 0, 255],
+            bg_color: [255, 255, 255, 255],
 
             logo_enabled: false,
             logo_template: LogoTemplate::HeartPulse,
@@ -117,12 +118,12 @@ impl Default for QrSettings {
             text_enabled: false,
             text_content: "Texto de ejemplo".to_string(),
             text_font: "Predeterminada".to_string(),
-            _text_icon: "👉 - Dedo apuntando a la derecha".to_string(),
+            _text_icon: "Icono de mano a la derecha".to_string(),
             text_casing: TextCasing::TextField,
             text_bold: true,
             text_italic: false,
             text_underline: false,
-            text_color: [255, 0, 128, 255], // Pink / Magenta h00FF80FF
+            text_color: [255, 0, 128, 255],
             text_font_size: 16.0,
             text_offset_x: 0,
             text_offset_y: 0,
@@ -134,7 +135,6 @@ impl Default for QrSettings {
 pub struct QrEngine;
 
 impl QrEngine {
-    /// Calcula el tamaño total de la matriz incluyendo bordes y escala
     pub fn compute_pixel_size(payload: &str, settings: &QrSettings) -> (u32, u32) {
         let code = match QrCode::with_error_correction_level(payload.as_bytes(), settings.ec_level.to_ec_level()) {
             Ok(c) => c,
@@ -146,7 +146,6 @@ impl QrEngine {
         (px, px)
     }
 
-    /// Genera la imagen completa RGBA del código QR
     pub fn generate_image(
         payload: &str,
         settings: &QrSettings,
@@ -159,7 +158,6 @@ impl QrEngine {
         let total_modules = matrix_size + settings.border * 2;
         let qr_px_size = (total_modules * settings.scale_factor) as u32;
 
-        // Si el texto bajo el QR está habilitado, añade una franja inferior
         let text_height = if settings.text_enabled && !settings.text_content.trim().is_empty() {
             (settings.text_font_size * 2.2).max(36.0) as u32
         } else {
@@ -175,7 +173,6 @@ impl QrEngine {
         let mut img: ImageBuffer<Rgba<u8>, Vec<u8>> =
             ImageBuffer::from_pixel(total_width, total_height, bg_pixel);
 
-        // Renderizar módulos oscuros
         for y in 0..matrix_size {
             for x in 0..matrix_size {
                 if modules[y * matrix_size + x] == Color::Dark {
@@ -193,14 +190,12 @@ impl QrEngine {
             }
         }
 
-        // Renderizar Logo si está habilitado
         if settings.logo_enabled {
             let logo_size = settings.logo_size_px.clamp(20, qr_px_size.saturating_sub(40));
             let center_x = ((qr_px_size / 2) as i32 + settings.logo_offset_x).max(logo_size as i32 / 2) as u32;
             let center_y = ((qr_px_size / 2) as i32 + settings.logo_offset_y).max(logo_size as i32 / 2) as u32;
             let half_logo = logo_size / 2;
 
-            // Fondo protector blanco redondeado detrás del logo
             let badge_padding = (logo_size as f32 * 0.12).round() as u32;
             let badge_half = half_logo + badge_padding;
 
@@ -220,7 +215,6 @@ impl QrEngine {
             }
 
             if let Some(logo) = custom_logo {
-                // Logo personalizado cargado desde archivo
                 let resized = image::imageops::resize(
                     logo,
                     logo_size,
@@ -243,7 +237,6 @@ impl QrEngine {
                     }
                 }
             } else {
-                // Plantilla de logo integrada
                 match settings.logo_template {
                     LogoTemplate::HeartPulse => {
                         Self::draw_heart_logo(&mut img, center_x, center_y, logo_size);
@@ -268,10 +261,138 @@ impl QrEngine {
             }
         }
 
+        if settings.text_enabled && !settings.text_content.trim().is_empty() {
+            let processed_text = match settings.text_casing {
+                TextCasing::TextField => settings.text_content.clone(),
+                TextCasing::Small => settings.text_content.to_lowercase(),
+                TextCasing::Great => settings.text_content.to_uppercase(),
+            };
+
+            Self::render_text_onto_image(
+                &mut img,
+                &processed_text,
+                settings.text_font_size,
+                settings.text_color,
+                qr_px_size,
+                settings.text_offset_x,
+                settings.text_offset_y,
+                settings.text_bold,
+                settings.text_italic,
+                settings.text_underline,
+            );
+        }
+
         Ok(img)
     }
 
-    /// Dibuja el logo de corazón con onda de pulso (idéntico a la imagen original)
+    pub fn render_text_onto_image(
+        img: &mut ImageBuffer<Rgba<u8>, Vec<u8>>,
+        text: &str,
+        requested_font_size: f32,
+        color: [u8; 4],
+        start_y: u32,
+        offset_x: i32,
+        offset_y: i32,
+        bold: bool,
+        italic: bool,
+        underline: bool,
+    ) {
+        if text.trim().is_empty() {
+            return;
+        }
+
+        let font_path = if bold && italic {
+            "C:\\Windows\\Fonts\\segoeuiz.ttf"
+        } else if bold {
+            "C:\\Windows\\Fonts\\segoeuib.ttf"
+        } else if italic {
+            "C:\\Windows\\Fonts\\segoeuii.ttf"
+        } else {
+            "C:\\Windows\\Fonts\\segoeui.ttf"
+        };
+
+        let font_bytes = std::fs::read(font_path)
+            .or_else(|_| std::fs::read("C:\\Windows\\Fonts\\arial.ttf"))
+            .ok();
+
+        if let Some(bytes) = &font_bytes {
+            if let Ok(font) = FontRef::try_from_slice(bytes) {
+                let img_w = img.width() as f32;
+                let mut font_size = requested_font_size.max(8.0);
+
+                let initial_scale = PxScale::from(font_size);
+                let initial_scaled = font.as_scaled(initial_scale);
+                let measured_width: f32 = text
+                    .chars()
+                    .map(|c| initial_scaled.h_advance(initial_scaled.glyph_id(c)))
+                    .sum();
+
+                if measured_width > (img_w - 16.0) && measured_width > 0.0 {
+                    let ratio = (img_w - 16.0) / measured_width;
+                    font_size = (font_size * ratio).max(8.0);
+                }
+
+                let scale = PxScale::from(font_size);
+                let scaled_font = font.as_scaled(scale);
+
+                let mut total_width = 0.0_f32;
+                let mut glyphs = Vec::new();
+                for ch in text.chars() {
+                    let glyph_id = scaled_font.glyph_id(ch);
+                    let advance = scaled_font.h_advance(glyph_id);
+                    glyphs.push((glyph_id, total_width));
+                    total_width += advance;
+                }
+
+                let text_start_x = ((img_w - total_width) / 2.0 + offset_x as f32).max(1.0);
+                let available_h = (img.height().saturating_sub(start_y)) as f32;
+                let text_baseline_y = start_y as f32 + (available_h * 0.65) + offset_y as f32;
+
+                for (glyph_id, x_off) in glyphs {
+                    let glyph = glyph_id.with_scale_and_position(
+                        scale,
+                        ab_glyph::point(text_start_x + x_off, text_baseline_y),
+                    );
+
+                    if let Some(outlined) = font.outline_glyph(glyph) {
+                        let bounds = outlined.px_bounds();
+                        outlined.draw(|gx, gy, coverage| {
+                            let px = bounds.min.x as i32 + gx as i32;
+                            let py = bounds.min.y as i32 + gy as i32;
+
+                            if px >= 0 && px < img.width() as i32 && py >= 0 && py < img.height() as i32 && coverage > 0.01 {
+                                let upx = px as u32;
+                                let upy = py as u32;
+                                let alpha = coverage * (color[3] as f32 / 255.0);
+                                let bg = img.get_pixel(upx, upy);
+
+                                let r = (color[0] as f32 * alpha + bg[0] as f32 * (1.0 - alpha)) as u8;
+                                let g = (color[1] as f32 * alpha + bg[1] as f32 * (1.0 - alpha)) as u8;
+                                let b = (color[2] as f32 * alpha + bg[2] as f32 * (1.0 - alpha)) as u8;
+
+                                img.put_pixel(upx, upy, Rgba([r, g, b, 255]));
+                            }
+                        });
+                    }
+                }
+
+                if underline {
+                    let ul_y = (text_baseline_y + 3.0) as u32;
+                    let ul_h = (font_size * 0.08).max(1.0) as u32;
+                    let ul_start = text_start_x as u32;
+                    let ul_end = ((text_start_x + total_width) as u32).min(img.width());
+                    for uy in ul_y..(ul_y + ul_h) {
+                        if uy < img.height() {
+                            for ux in ul_start..ul_end {
+                                img.put_pixel(ux, uy, Rgba(color));
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     pub fn draw_heart_logo(img: &mut ImageBuffer<Rgba<u8>, Vec<u8>>, cx: u32, cy: u32, size: u32) {
         let red = Rgba([239, 68, 68, 255]);
         let white = Rgba([255, 255, 255, 255]);
@@ -298,7 +419,6 @@ impl QrEngine {
             }
         }
 
-        // Línea de pulso blanco
         let pulse_w = (radius * 0.65) as i32;
         let line_thickness = (size as f32 * 0.07).max(2.0) as i32;
 
@@ -327,7 +447,6 @@ impl QrEngine {
         }
     }
 
-    /// Dibuja un logo de estrella dorada
     pub fn draw_star_logo(img: &mut ImageBuffer<Rgba<u8>, Vec<u8>>, cx: u32, cy: u32, size: u32) {
         let gold = Rgba([245, 158, 11, 255]);
         let r_outer = size as f32 * 0.45;
@@ -354,7 +473,6 @@ impl QrEngine {
         }
     }
 
-    /// Dibuja un logo de escudo azul
     pub fn draw_shield_logo(img: &mut ImageBuffer<Rgba<u8>, Vec<u8>>, cx: u32, cy: u32, size: u32) {
         let blue = Rgba([37, 99, 235, 255]);
         let white = Rgba([255, 255, 255, 255]);
@@ -375,7 +493,6 @@ impl QrEngine {
             }
         }
 
-        // Marca de verificación blanca dentro del escudo
         let check_size = (size as f32 * 0.15) as i32;
         for t in -check_size..=check_size {
             let px = (cx as i32 + t) as u32;
@@ -386,7 +503,6 @@ impl QrEngine {
         }
     }
 
-    /// Dibuja el icono de WiFi
     pub fn draw_wifi_logo(img: &mut ImageBuffer<Rgba<u8>, Vec<u8>>, cx: u32, cy: u32, size: u32) {
         let green = Rgba([16, 185, 129, 255]);
         let radius = size as f32 * 0.4;
@@ -414,7 +530,6 @@ impl QrEngine {
         }
     }
 
-    /// Dibuja el icono de X (Twitter)
     pub fn draw_twitter_logo(img: &mut ImageBuffer<Rgba<u8>, Vec<u8>>, cx: u32, cy: u32, size: u32) {
         let dark = Rgba([15, 20, 25, 255]);
         let white = Rgba([255, 255, 255, 255]);
@@ -450,7 +565,6 @@ impl QrEngine {
         }
     }
 
-    /// Dibuja el avatar de usuario
     pub fn draw_user_logo(img: &mut ImageBuffer<Rgba<u8>, Vec<u8>>, cx: u32, cy: u32, size: u32) {
         let blue = Rgba([59, 130, 246, 255]);
         let white = Rgba([255, 255, 255, 255]);
@@ -469,7 +583,6 @@ impl QrEngine {
             }
         }
 
-        // Cabeza
         let head_r = (size as f32 * 0.12) as i32;
         let head_cy = cy as i32 - (size as f32 * 0.1) as i32;
         for dy in -head_r..=head_r {
@@ -485,7 +598,6 @@ impl QrEngine {
         }
     }
 
-    /// Genera código SVG vectorial con soporte para texto y logo
     pub fn generate_svg(payload: &str, settings: &QrSettings) -> Result<String, QrError> {
         let code = QrCode::with_error_correction_level(payload.as_bytes(), settings.ec_level.to_ec_level())?;
         let modules = code.to_colors();
@@ -512,7 +624,6 @@ impl QrEngine {
             width, height, bg_hex
         ));
 
-        // Módulos
         for y in 0..matrix_size {
             for x in 0..matrix_size {
                 if modules[y * matrix_size + x] == Color::Dark {
@@ -526,14 +637,11 @@ impl QrEngine {
             }
         }
 
-        // Logo badge si está activo
         if settings.logo_enabled {
             let logo_size = settings.logo_size_px as usize;
             let center_x = ((width / 2) as i32 + settings.logo_offset_x).max(logo_size as i32 / 2) as usize;
             let center_y = ((width / 2) as i32 + settings.logo_offset_y).max(logo_size as i32 / 2) as usize;
             let badge_size = (logo_size as f32 * 1.25) as usize;
-            let _badge_x = center_x.saturating_sub(badge_size / 2);
-            let _badge_y = center_y.saturating_sub(badge_size / 2);
 
             svg.push_str(&format!(
                 r#"<circle cx="{}" cy="{}" r="{}" fill="{}" />"#,
@@ -541,7 +649,6 @@ impl QrEngine {
             ));
         }
 
-        // Texto inferior
         if has_text {
             let text_val = match settings.text_casing {
                 TextCasing::TextField => settings.text_content.clone(),
@@ -570,7 +677,6 @@ impl QrEngine {
         Ok(svg)
     }
 
-    /// Genera código EPS (Encapsulated PostScript)
     pub fn generate_eps(payload: &str, settings: &QrSettings) -> Result<String, QrError> {
         let code = QrCode::with_error_correction_level(payload.as_bytes(), settings.ec_level.to_ec_level())?;
         let modules = code.to_colors();
@@ -585,14 +691,12 @@ impl QrEngine {
         eps.push_str("%%Pages: 1\n");
         eps.push_str("%%EndComments\n");
 
-        // Fondo
         let r = settings.bg_color[0] as f32 / 255.0;
         let g = settings.bg_color[1] as f32 / 255.0;
         let b = settings.bg_color[2] as f32 / 255.0;
         eps.push_str(&format!("{} {} {} setrgbcolor\n", r, g, b));
         eps.push_str(&format!("0 0 {} {} rectfill\n", width, width));
 
-        // Frente
         let fr = settings.fg_color[0] as f32 / 255.0;
         let fg = settings.fg_color[1] as f32 / 255.0;
         let fb = settings.fg_color[2] as f32 / 255.0;
@@ -602,7 +706,7 @@ impl QrEngine {
             for x in 0..matrix_size {
                 if modules[y * matrix_size + x] == Color::Dark {
                     let rx = (x + settings.border) * scale;
-                    let ry = width - ((y + settings.border + 1) * scale); // Invertir eje Y para PostScript
+                    let ry = width - ((y + settings.border + 1) * scale);
                     eps.push_str(&format!("{} {} {} {} rectfill\n", rx, ry, scale, scale));
                 }
             }
@@ -632,7 +736,7 @@ mod tests {
             scale_factor: 7,
             ..Default::default()
         };
-        let (w, h) = QrEngine::compute_pixel_size("¡Mi primer código QR!", &settings);
+        let (w, h) = QrEngine::compute_pixel_size("Mi primer codigo QR", &settings);
         assert!(w > 0);
         assert_eq!(w, h);
     }
@@ -640,7 +744,7 @@ mod tests {
     #[test]
     fn test_generate_image_basic() {
         let settings = QrSettings::default();
-        let img = QrEngine::generate_image("¡Mi primer código QR!", &settings, None).unwrap();
+        let img = QrEngine::generate_image("Mi primer codigo QR", &settings, None).unwrap();
         assert!(img.width() > 0);
         assert!(img.height() > 0);
     }
@@ -673,5 +777,33 @@ mod tests {
         assert!(eps.starts_with("%!PS-Adobe-3.0 EPSF-3.0"));
         assert!(eps.contains("%%EOF"));
     }
-}
 
+    #[test]
+    fn test_generate_image_with_bottom_text() {
+        let settings = QrSettings {
+            text_enabled: true,
+            text_content: "Texto de ejemplo".to_string(),
+            text_color: [255, 0, 128, 255],
+            text_font_size: 16.0,
+            ..Default::default()
+        };
+        let img = QrEngine::generate_image("https://rust-lang.org", &settings, None).unwrap();
+        assert!(img.height() > img.width());
+
+        let qr_size = img.width();
+        let mut found_text_pixel = false;
+        for y in qr_size..img.height() {
+            for x in 0..img.width() {
+                let pixel = img.get_pixel(x, y);
+                if pixel[0] != 255 || pixel[1] != 255 || pixel[2] != 255 {
+                    found_text_pixel = true;
+                    break;
+                }
+            }
+            if found_text_pixel {
+                break;
+            }
+        }
+        assert!(found_text_pixel, "El texto inferior debe ser renderizado en la imagen");
+    }
+}

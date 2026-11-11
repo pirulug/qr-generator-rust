@@ -38,7 +38,7 @@ fn main() -> eframe::Result<()> {
                 if let Err(e) = img.save(output_path) {
                     eprintln!("Error al guardar imagen {}: {}", output_path, e);
                 } else {
-                    println!("✓ Imagen guardada exitosamente en {}", output_path);
+                    println!("Imagen guardada exitosamente en {}", output_path);
                 }
             }
             Err(e) => {

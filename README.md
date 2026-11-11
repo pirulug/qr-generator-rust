@@ -1,6 +1,28 @@
-# Creador de Codigos QR V7.8.1.3 (Windows) - Edicion Rust
+# QR Generator v0.0.1 (Windows)
 
 Aplicacion nativa de escritorio en Rust disenada para ser visual y funcionalmente fiel al software profesional de referencia, con diseno optimizado para fondo blanco y completamente en espanol.
+
+## Desarrollador
+
+Programado por Pirulug:
+- Web: https://pirulug.com
+- GitHub: https://github.com/pirulug
+
+## Icono Oficial de la Aplicacion
+
+El proyecto integra el icono oficial `img/icon.ico`:
+- Incrustado en el archivo binario de Windows (`qr_generator.exe`) como recurso nativo de ejecutable.
+- Configurado como icono de la ventana principal y de la barra de tareas de Windows.
+- Disponible en la barra de herramientas y en la ventana informativa "Acerca de".
+- Integrado como plantilla predefinida en la pestana "Logo en QR" y exportacion vectorial SVG.
+
+## Icono Oficial de la Aplicacion
+
+El proyecto integra el icono oficial `img/icon.ico`:
+- Incrustado en el archivo binario de Windows (`qr_generator.exe`) como recurso nativo de ejecutable.
+- Configurado como icono de la ventana principal y de la barra de tareas de Windows.
+- Disponible en la barra de herramientas y en la ventana informativa "Acerca de".
+- Integrado como plantilla predefinida en la pestana "Logo en QR" y exportacion vectorial SVG.
 
 ## Interfaz en Espanol para Fondo Blanco
 
@@ -10,7 +32,7 @@ Barra de Menu Superior:
 - `Plantillas QR`: Texto libre, Enlace (URL), Tweet de X (Twitter), Contacto (vCard), Red WiFi (WLAN), Fecha / Evento, Pago PayPal, Datos bancarios IBAN / BIC, Codigo TOTP (2FA), Programar codigo QR.
 - `Ver`: Restablecer vista.
 - `Configuracion`: Idioma: Espanol.
-- `Ayuda`: Acerca de Creador de Codigos QR.
+- `Ayuda`: Acerca de QR Generator.
 
 Barra de Herramientas:
 - `Actualizar`: Regenera la visualizacion del codigo QR en tiempo real.
@@ -46,7 +68,7 @@ Lienzo Blanco Central:
 3. `Logo en QR`:
    - Casilla Habilitar logo central.
    - Botones Seleccionar imagen y Quitar imagen.
-   - Plantillas integradas: Corazon / Pulso, Estrella, Escudo, Simbolo Wi-Fi, X (Twitter) y Avatar de contacto.
+   - Plantillas integradas: Icono de la aplicacion (icon.ico), Corazon / Pulso, Estrella, Escudo, Simbolo Wi-Fi, X (Twitter) y Avatar de contacto.
    - Control de tamano en pixeles al cuadrado.
    - Casillas Mantener centrado al redimensionar y Comprobar validez.
    - Boton Ajuste automatico (nivel de error Alto y tamano optimo).

@@ -14,7 +14,7 @@ fn main() -> eframe::Result<()> {
     if args.len() > 1 {
         let first = &args[1];
         if first == "--help" || first == "-h" {
-            println!("=== Creador de Códigos QR (Edición Rust) ===");
+            println!("=== QR Generator (Edicion Rust) ===");
             println!("Uso:");
             println!("  cargo run                      (Inicia la interfaz gráfica completa en español)");
             println!("  cargo run -- <texto_o_url> [archivo_salida.png]");
@@ -48,17 +48,39 @@ fn main() -> eframe::Result<()> {
         return Ok(());
     }
 
-    // Modo GUI Nativo de Escritorio (en español, idéntico a las capturas)
+    // Modo GUI Nativo de Escritorio (en espanol, identico a las capturas)
+    let icon_data = {
+        let ico_bytes = include_bytes!("../img/icon.ico");
+        match image::load_from_memory_with_format(ico_bytes, image::ImageFormat::Ico) {
+            Ok(img) => {
+                let rgba = img.to_rgba8();
+                let (width, height) = (rgba.width(), rgba.height());
+                Some(std::sync::Arc::new(egui::IconData {
+                    rgba: rgba.into_raw(),
+                    width,
+                    height,
+                }))
+            }
+            Err(_) => None,
+        }
+    };
+
+    let mut viewport = egui::ViewportBuilder::default()
+        .with_inner_size([820.0, 780.0])
+        .with_min_inner_size([650.0, 680.0])
+        .with_title("QR Generator v0.0.1 (Windows) - Modulo Logo II");
+
+    if let Some(icon) = icon_data {
+        viewport = viewport.with_icon(icon);
+    }
+
     let native_options = eframe::NativeOptions {
-        viewport: egui::ViewportBuilder::default()
-            .with_inner_size([820.0, 780.0])
-            .with_min_inner_size([650.0, 680.0])
-            .with_title("Creador de Códigos QR V7.8.1.3 (Windows) - Módulo Logo II"),
+        viewport,
         ..Default::default()
     };
 
     eframe::run_native(
-        "Creador de Códigos QR V7.8.1.3 (Windows) - Módulo Logo II",
+        "QR Generator v0.0.1 (Windows) - Modulo Logo II",
         native_options,
         Box::new(|cc| Ok(Box::new(QrApp::new(cc)))),
     )

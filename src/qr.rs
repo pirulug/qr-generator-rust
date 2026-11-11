@@ -33,6 +33,7 @@ impl ErrorCorrection {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum LogoTemplate {
     None,
+    AppIcon,
     HeartPulse,
     Star,
     Shield,
@@ -45,6 +46,7 @@ impl LogoTemplate {
     pub fn label(self) -> &'static str {
         match self {
             Self::None => "---",
+            Self::AppIcon => "Icono de la aplicacion (icon.ico)",
             Self::HeartPulse => "Corazon / Pulso",
             Self::Star => "Estrella",
             Self::Shield => "Escudo",
@@ -238,6 +240,9 @@ impl QrEngine {
                 }
             } else {
                 match settings.logo_template {
+                    LogoTemplate::AppIcon => {
+                        Self::draw_app_icon_logo(&mut img, center_x, center_y, logo_size);
+                    }
                     LogoTemplate::HeartPulse => {
                         Self::draw_heart_logo(&mut img, center_x, center_y, logo_size);
                     }
@@ -388,6 +393,58 @@ impl QrEngine {
                             }
                         }
                     }
+                }
+            }
+        }
+    }
+
+    pub fn draw_app_icon_logo(img: &mut ImageBuffer<Rgba<u8>, Vec<u8>>, cx: u32, cy: u32, size: u32) {
+        let ico_bytes = include_bytes!("../img/icon.ico");
+        if let Ok(dyn_img) = image::load_from_memory_with_format(ico_bytes, image::ImageFormat::Ico) {
+            let rgba = dyn_img.to_rgba8();
+            let half = size / 2;
+            let start_x = cx.saturating_sub(half);
+            let start_y = cy.saturating_sub(half);
+
+            let pad = (size as f32 * 0.08).max(3.0) as i32;
+            let badge_half = half as i32 + pad;
+            let badge_corner_r = (badge_half as f32 * 0.35) as i32;
+            let white = Rgba([255, 255, 255, 255]);
+
+            for dy in -badge_half..=badge_half {
+                for dx in -badge_half..=badge_half {
+                    let px = (cx as i32 + dx) as u32;
+                    let py = (cy as i32 + dy) as u32;
+                    if px >= img.width() || py >= img.height() {
+                        continue;
+                    }
+
+                    let inner_x = dx.abs() - (badge_half - badge_corner_r);
+                    let inner_y = dy.abs() - (badge_half - badge_corner_r);
+                    if inner_x > 0 && inner_y > 0 && inner_x * inner_x + inner_y * inner_y > badge_corner_r * badge_corner_r {
+                        continue;
+                    }
+                    img.put_pixel(px, py, white);
+                }
+            }
+
+            let resized = image::imageops::resize(
+                &rgba,
+                size,
+                size,
+                image::imageops::FilterType::Lanczos3,
+            );
+
+            for (lx, ly, pixel) in resized.enumerate_pixels() {
+                let tx = start_x + lx;
+                let ty = start_y + ly;
+                if tx < img.width() && ty < img.height() && pixel[3] > 0 {
+                    let alpha = pixel[3] as f32 / 255.0;
+                    let bg = img.get_pixel(tx, ty);
+                    let r = (pixel[0] as f32 * alpha + bg[0] as f32 * (1.0 - alpha)) as u8;
+                    let g = (pixel[1] as f32 * alpha + bg[1] as f32 * (1.0 - alpha)) as u8;
+                    let b = (pixel[2] as f32 * alpha + bg[2] as f32 * (1.0 - alpha)) as u8;
+                    img.put_pixel(tx, ty, Rgba([r, g, b, 255]));
                 }
             }
         }
@@ -647,6 +704,23 @@ impl QrEngine {
                 r#"<circle cx="{}" cy="{}" r="{}" fill="{}" />"#,
                 center_x, center_y, badge_size / 2, bg_hex
             ));
+
+            if settings.logo_template == LogoTemplate::AppIcon {
+                let ico_bytes = include_bytes!("../img/icon.ico");
+                if let Ok(dyn_img) = image::load_from_memory_with_format(ico_bytes, image::ImageFormat::Ico) {
+                    let mut png_bytes = Vec::new();
+                    let mut cursor = std::io::Cursor::new(&mut png_bytes);
+                    if dyn_img.write_to(&mut cursor, image::ImageFormat::Png).is_ok() {
+                        let b64 = base64_encode(&png_bytes);
+                        let top_left_x = center_x.saturating_sub(logo_size / 2);
+                        let top_left_y = center_y.saturating_sub(logo_size / 2);
+                        svg.push_str(&format!(
+                            r#"<image href="data:image/png;base64,{}" x="{}" y="{}" width="{}" height="{}" />"#,
+                            b64, top_left_x, top_left_y, logo_size, logo_size
+                        ));
+                    }
+                }
+            }
         }
 
         if has_text {
@@ -723,6 +797,33 @@ fn html_escape(s: &str) -> String {
         .replace('>', "&gt;")
         .replace('"', "&quot;")
         .replace('\'', "&apos;")
+}
+
+pub fn base64_encode(data: &[u8]) -> String {
+    const TABLE: &[u8; 64] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+    let mut out = String::new();
+    let mut i = 0;
+    while i < data.len() {
+        let b0 = data[i] as u32;
+        let b1 = if i + 1 < data.len() { data[i + 1] as u32 } else { 0 };
+        let b2 = if i + 2 < data.len() { data[i + 2] as u32 } else { 0 };
+        let triple = (b0 << 16) | (b1 << 8) | b2;
+
+        out.push(TABLE[((triple >> 18) & 0x3F) as usize] as char);
+        out.push(TABLE[((triple >> 12) & 0x3F) as usize] as char);
+        if i + 1 < data.len() {
+            out.push(TABLE[((triple >> 6) & 0x3F) as usize] as char);
+        } else {
+            out.push('=');
+        }
+        if i + 2 < data.len() {
+            out.push(TABLE[(triple & 0x3F) as usize] as char);
+        } else {
+            out.push('=');
+        }
+        i += 3;
+    }
+    out
 }
 
 #[cfg(test)]
@@ -805,5 +906,28 @@ mod tests {
             }
         }
         assert!(found_text_pixel, "El texto inferior debe ser renderizado en la imagen");
+    }
+
+    #[test]
+    fn test_load_ico_bytes() {
+        let ico_bytes = include_bytes!("../img/icon.ico");
+        let img = image::load_from_memory_with_format(ico_bytes, image::ImageFormat::Ico).expect("Debe cargar icon.ico");
+        let rgba = img.to_rgba8();
+        assert!(rgba.width() > 0 && rgba.height() > 0);
+    }
+
+    #[test]
+    fn test_generate_image_with_app_icon_logo() {
+        let settings = QrSettings {
+            logo_enabled: true,
+            logo_template: LogoTemplate::AppIcon,
+            logo_size_px: 80,
+            ..Default::default()
+        };
+        let img = QrEngine::generate_image("https://pirulug.com", &settings, None).unwrap();
+        assert!(img.width() > 0);
+
+        let svg = QrEngine::generate_svg("https://pirulug.com", &settings).unwrap();
+        assert!(svg.contains("<image href=\"data:image/png;base64,"));
     }
 }

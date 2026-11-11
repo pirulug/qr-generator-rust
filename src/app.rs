@@ -84,6 +84,8 @@ pub struct QrApp {
     show_bg_picker: bool,
     show_fg_picker: bool,
     show_txt_picker: bool,
+
+    app_icon_texture: Option<TextureHandle>,
 }
 
 impl Default for QrApp {
@@ -104,6 +106,7 @@ impl Default for QrApp {
             custom_logo_path: None,
 
             texture: None,
+            app_icon_texture: None,
             dirty: true,
             status_message: "Listo. Codigo QR generado correctamente.".to_string(),
             last_computed_size: initial_size,
@@ -368,6 +371,16 @@ impl QrApp {
 
 impl eframe::App for QrApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+        if self.app_icon_texture.is_none() {
+            let ico_bytes = include_bytes!("../img/icon.ico");
+            if let Ok(dyn_img) = image::load_from_memory_with_format(ico_bytes, image::ImageFormat::Ico) {
+                let rgba = dyn_img.to_rgba8();
+                let (w, h) = (rgba.width() as usize, rgba.height() as usize);
+                let color_image = ColorImage::from_rgba_unmultiplied([w, h], &rgba.into_raw());
+                self.app_icon_texture = Some(ctx.load_texture("app_icon_tex", color_image, TextureOptions::LINEAR));
+            }
+        }
+
         if self.dirty || self.texture.is_none() {
             self.regenerate_qr(ctx);
         }
@@ -461,7 +474,7 @@ impl eframe::App for QrApp {
                     });
 
                     ui.menu_button("Ayuda", |ui| {
-                        if ui.button("Acerca de Creador de Codigos QR").clicked() {
+                        if ui.button("Acerca de QR Generator").clicked() {
                             self.active_modal = TemplateModal::About;
                             ui.close_menu();
                         }
@@ -479,6 +492,11 @@ impl eframe::App for QrApp {
             )
             .show(ctx, |ui| {
                 ui.horizontal(|ui| {
+                    if let Some(tex) = &self.app_icon_texture {
+                        ui.image((tex.id(), egui::vec2(22.0, 22.0)));
+                        ui.add_space(2.0);
+                    }
+
                     if secondary_button(ui, "Actualizar").clicked() {
                         self.dirty = true;
                     }
@@ -770,6 +788,9 @@ impl eframe::App for QrApp {
                                     if ui.checkbox(&mut self.settings.logo_enabled, "Habilitar logo central").changed() {
                                         if self.settings.logo_enabled {
                                             self.settings.ec_level = ErrorCorrection::High;
+                                            if self.settings.logo_template == LogoTemplate::None && self.custom_logo_img.is_none() {
+                                                self.settings.logo_template = LogoTemplate::AppIcon;
+                                            }
                                         }
                                         self.dirty = true;
                                     }
@@ -799,6 +820,7 @@ impl eframe::App for QrApp {
                                             .selected_text(self.settings.logo_template.label())
                                             .show_ui(ui, |ui| {
                                                 ui.selectable_value(&mut self.settings.logo_template, LogoTemplate::None, "---");
+                                                ui.selectable_value(&mut self.settings.logo_template, LogoTemplate::AppIcon, "Icono de la aplicacion (icon.ico)");
                                                 ui.selectable_value(&mut self.settings.logo_template, LogoTemplate::HeartPulse, "Corazon / Pulso");
                                                 ui.selectable_value(&mut self.settings.logo_template, LogoTemplate::Star, "Estrella");
                                                 ui.selectable_value(&mut self.settings.logo_template, LogoTemplate::Shield, "Escudo");
@@ -1297,13 +1319,34 @@ impl QrApp {
 
             TemplateModal::About => {
                 let mut open = true;
-                egui::Window::new("Acerca de Creador de Codigos QR")
+                egui::Window::new("Acerca de QR Generator")
                     .open(&mut open)
                     .resizable(false)
                     .show(ctx, |ui| {
-                        ui.heading("Creador de Codigos QR V7.8.1.3 (Edicion Rust)");
-                        ui.label("Generador nativo de codigos QR escrito 100% en Rust.");
+                        ui.horizontal(|ui| {
+                            if let Some(tex) = &self.app_icon_texture {
+                                ui.image((tex.id(), egui::vec2(44.0, 44.0)));
+                                ui.add_space(8.0);
+                            }
+                            ui.vertical(|ui| {
+                                ui.heading("QR Generator v0.0.1 (Edicion Rust)");
+                                ui.label("Generador nativo de codigos QR escrito 100% en Rust.");
+                            });
+                        });
+                        ui.add_space(6.0);
                         ui.label("Diseno limpio optimizado para fondo blanco, con soporte para logotipos, paletas de colores y exportacion vectorial.");
+                        ui.add_space(8.0);
+                        ui.separator();
+                        ui.add_space(8.0);
+                        ui.label(egui::RichText::new("Programador: Pirulug").strong());
+                        ui.horizontal(|ui| {
+                            ui.label("Web:");
+                            ui.hyperlink_to("pirulug.com", "https://pirulug.com");
+                        });
+                        ui.horizontal(|ui| {
+                            ui.label("GitHub:");
+                            ui.hyperlink_to("github.com/pirulug", "https://github.com/pirulug");
+                        });
                         ui.add_space(12.0);
                         if primary_button(ui, "Cerrar").clicked() {
                             self.active_modal = TemplateModal::None;

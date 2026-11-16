@@ -15,7 +15,38 @@ fn main() {
             return;
         }
 
-        let rc_content = format!("1 ICON \"{}\"\n", icon_path.display().to_string().replace('\\', "\\\\"));
+        let manifest_path = out_dir.join("app.manifest");
+        let manifest_xml = r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<assembly xmlns="urn:schemas-microsoft-com:asm.v1" manifestVersion="1.0">
+  <assemblyIdentity version="1.0.0.0" processorArchitecture="*" name="QRGenerator" type="win32"/>
+  <description>QR Generator</description>
+  <dependency>
+    <dependentAssembly>
+      <assemblyIdentity
+        type="win32"
+        name="Microsoft.Windows.Common-Controls"
+        version="6.0.0.0"
+        processorArchitecture="*"
+        publicKeyToken="6595b64144ccf1df"
+        language="*"
+      />
+    </dependentAssembly>
+  </dependency>
+  <application xmlns="urn:schemas-microsoft-com:asm.v3">
+    <windowsSettings>
+      <dpiAware xmlns="http://schemas.microsoft.com/SMI/2005/WindowsSettings">true/pm</dpiAware>
+      <dpiAwareness xmlns="http://schemas.microsoft.com/SMI/2016/WindowsSettings">PerMonitorV2, PerMonitor</dpiAwareness>
+    </windowsSettings>
+  </application>
+</assembly>
+"#;
+        let _ = std::fs::write(&manifest_path, manifest_xml);
+
+        let rc_content = format!(
+            "1 ICON \"{}\"\n1 24 \"{}\"\n",
+            icon_path.display().to_string().replace('\\', "\\\\"),
+            manifest_path.display().to_string().replace('\\', "\\\\")
+        );
         let rc_path = out_dir.join("app.rc");
         let res_path = out_dir.join("app.res");
 
@@ -49,4 +80,3 @@ fn main() {
         }
     }
 }
-

@@ -1,13 +1,12 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
+#![allow(unused_must_use, dead_code, unused_imports)]
 
-mod app;
 mod qr;
+mod ui;
 
-use app::QrApp;
-use eframe::egui;
 use qr::{QrEngine, QrSettings};
 
-fn main() -> eframe::Result<()> {
+fn main() -> Result<(), Box<dyn std::error::Error>> {
     let args: Vec<String> = std::env::args().collect();
 
     // Modo CLI opcional si se pasan argumentos por consola
@@ -16,7 +15,7 @@ fn main() -> eframe::Result<()> {
         if first == "--help" || first == "-h" {
             println!("=== QR Generator (Edicion Rust) ===");
             println!("Uso:");
-            println!("  cargo run                      (Inicia la interfaz gráfica completa en español)");
+            println!("  cargo run                      (Inicia la interfaz grafica nativa Windows en espanol)");
             println!("  cargo run -- <texto_o_url> [archivo_salida.png]");
             println!("Ejemplo:");
             println!("  cargo run -- \"https://rust-lang.org\" codigo_qr.png");
@@ -30,7 +29,7 @@ fn main() -> eframe::Result<()> {
             "codigo_qr.png"
         };
 
-        println!("Generando código QR para: {}", payload);
+        println!("Generando codigo QR para: {}", payload);
         let settings = QrSettings::default();
 
         match QrEngine::generate_image(payload, &settings, None) {
@@ -48,40 +47,7 @@ fn main() -> eframe::Result<()> {
         return Ok(());
     }
 
-    // Modo GUI Nativo de Escritorio (en espanol, identico a las capturas)
-    let icon_data = {
-        let ico_bytes = include_bytes!("../img/icon.ico");
-        match image::load_from_memory_with_format(ico_bytes, image::ImageFormat::Ico) {
-            Ok(img) => {
-                let rgba = img.to_rgba8();
-                let (width, height) = (rgba.width(), rgba.height());
-                Some(std::sync::Arc::new(egui::IconData {
-                    rgba: rgba.into_raw(),
-                    width,
-                    height,
-                }))
-            }
-            Err(_) => None,
-        }
-    };
-
-    let mut viewport = egui::ViewportBuilder::default()
-        .with_inner_size([820.0, 780.0])
-        .with_min_inner_size([650.0, 680.0])
-        .with_title("QR Generator v0.0.1 (Windows) - Modulo Logo II");
-
-    if let Some(icon) = icon_data {
-        viewport = viewport.with_icon(icon);
-    }
-
-    let native_options = eframe::NativeOptions {
-        viewport,
-        ..Default::default()
-    };
-
-    eframe::run_native(
-        "QR Generator v0.0.1 (Windows) - Modulo Logo II",
-        native_options,
-        Box::new(|cc| Ok(Box::new(QrApp::new(cc)))),
-    )
+    // Modo GUI Nativo de Escritorio con windows-rs (puro Win32)
+    ui::run_windows_app()?;
+    Ok(())
 }
